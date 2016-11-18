@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <script src="Grid.js"></script>
+    <script src="tetris.js"></script>
+    <script>
+        function ready() {
+            var grid = new StaticGrid(8, 8, "40em", "40em");
+
+            grid.cellStyle({
+                border: "black solid 1px"
+            });
+
+            grid.gridStyle({
+                border: "black solid 1px",
+                transform: "translateY(-50%)",
+                top: "50%",
+                margin: "0 auto",
+                position: "relative"
+            });
+
+            grid.create(document.getElementById("grid"));
+
+            var ghost = null;
+            var piece = null;
+            grid.forEachCell(function (cell, data) {
+                cell.addEventListener('click', function() {
+                    if (!piece) {
+                        return;
+                    }
+
+                    try {
+                        piece.drawOnGrid(grid, data.x, data.y);
+                    } catch (e) {
+                        return;
+                    }
+                    
+                    piece.invalidate();
+                    deselectPiece();
+
+                    gridUpdate(grid);
+                });
+                cell.addEventListener('mouseover', function() {
+                    if (!piece) {
+                        return;
+                    }
+
+                    if (ghost) {
+                        ghost.onDestroy(function () {
+                            ghost = piece.drawGhostOnGrid(grid, data.x, data.y);
+                        });
+                    } else {
+                        ghost = piece.drawGhostOnGrid(grid, data.x, data.y);
+                    }
+                });
+                cell.addEventListener('mouseout', function() {
+                    if (!piece) {
+                        return;
+                    }
+
+                    if (ghost) {
+                        ghost.destroy(function () {
+                            ghost = null;
+                        });
+                    }
+                });
+            });
+
+            function selectPiece(newPiece) {
+                piece = newPiece;
+            }
+            function deselectPiece() {
+                piece = null;
+            }
+
+            var shapeOptions = document.querySelectorAll("li.shape-option");
+            var shapeOptionCount = 0;
+
+            function resetShapeOptions() {
+                shapeOptions.forEach(function (option) {
+                    option.innerHTML = "";
+                    option.style.cssText = "";
+                });
+            }
+
+            function populateShapeOptions() {
+                var shape_grid;
+                var currentClickIndex = -1;
+                var styleGetters = {};
+                var isInvalidated = {};
+                var invalidCount = 0;
+
+                shapeOptions.forEach(function (option, index) {
+                    option.style.cursor = "pointer";
+
+                    //Decide on the shape
+                    var chosenShape = possibleShapes[Math.floor(Math.random() * possibleShapes.length)];
+                    var piece = getPiece(chosenShape.shape, {x: chosenShape.center[0], y: chosenShape.center[1]}, chosenShape.color);
+
+                    //Create the grid
+                    shape_grid = new StaticGrid(piece.width(), piece.height(), piece.width() * 2 + "em", piece.height() * 2 + "em");
+                    shape_grid.gridStyle({
+                        position: "relative",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translateX(-50%) translateY(-50%)"
+                    });
+                    shape_grid.cellStyle({
+                        width: "2em",
+                        height: "2em",
+                        boxSizing: "border-box",
+                        padding: "0.15em"
+                    });
+                    shape_grid.rowStyle({
+                        height: "2em",
+                        width: "100%"
+                    });
+                    shape_grid.create(option);
+
+                    var invalidated = false;
+                    piece.drawSampleOnGrid(shape_grid, chosenShape.center[0], chosenShape.center[1]);
+                    piece.invalidate = function () {
+                        option.style.opacity = "0.15";
+                        invalidated = true;
+
+                        if (++invalidCount === 3) {
+                            resetShapeOptions();
+                            populateShapeOptions();
+                        }
+                    };
+
+                    isInvalidated[index] = function () {
+                        return invalidated;
+                    };
+
+                    styleGetters[index] = function () {
+                        return option.style;
+                    };
+
+                    option.addEventListener('click', function () {
+                        if (invalidated) {
+                            return;
+                        }
+
+                        if (currentClickIndex === -1) {
+                            option.style.opacity = "0.5";
+                            currentClickIndex = index;
+
+                            selectPiece(piece);
+                        } else if (currentClickIndex === index) {
+                            option.style.opacity = "1";
+                            currentClickIndex = -1;
+
+                            deselectPiece();
+                        } else {
+                            Object.keys(styleGetters).forEach(function (i) {
+                                if (!isInvalidated[i]) {
+                                    styleGetters[i]().opacity = "1";
+                                }
+                            });
+
+                            deselectPiece();
+
+                            option.style.opacity = "0.5";
+                            currentClickIndex = index;
+
+                            selectPiece(piece);
+                        }
+                    });
+                });
+            }
+
+            populateShapeOptions();
+        }
+    </script>
+
+    <link rel="stylesheet" href="tetris.css" />
+</head>
+<body onload="ready()">
+    <div id="tetris">
+        <div>
+            <div id="grid">
+
+            </div>
+            <div id="sidebar">
+                <div class="content">
+                    <ul>
+                        <li style="height: 10%"></li>
+                        <li class="shape-option"></li>
+                        <li class="shape-option"></li>
+                        <li class="shape-option"></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
